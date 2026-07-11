@@ -8,7 +8,7 @@ export const BRAND = {
     /** Solid white background — reports, light surfaces */
     solid: '/assets/logos/logo.png',
   },
-  /** Simplified icon for favicon / PWA (no small text) */
+  /** PWA / favicon generated from official transparent logo */
   pwaIcon: '/icons/icon-192x192.png',
   themeColor: '#0b7377',
 } as const;
