@@ -3931,6 +3931,13 @@ a:hover {
 }
 
 @media (max-width: 900px) {
+  :root {
+    --mobile-bottom-nav-bar: 6.25rem;
+    --mobile-bottom-nav-safe: max(0.625rem, env(safe-area-inset-bottom, 0px));
+    --mobile-bottom-nav-height: calc(var(--mobile-bottom-nav-bar) + var(--mobile-bottom-nav-safe));
+    --mobile-sticky-actions-offset: 4.75rem;
+  }
+
   .app-shell {
     flex-direction: column;
   }
@@ -4237,15 +4244,17 @@ a:hover {
     margin-top: 0.15rem;
   }
 
-  .page.new-test .new-test__workflow {
-    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  .page.new-test .new-test__workflow,
+  .page.quick-check:has(.form-actions--taylor) {
+    padding-bottom: calc(var(--mobile-sticky-actions-offset) + 0.5rem);
   }
 
-  .page.new-test .form-actions--taylor {
+  .page.new-test .form-actions--taylor,
+  .page.quick-check .form-actions--taylor {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+    bottom: var(--mobile-bottom-nav-height);
     z-index: 95;
     margin-top: 0;
     padding: 0.75rem 1.25rem;
@@ -4257,13 +4266,15 @@ a:hover {
     justify-content: stretch;
   }
 
-  .page.new-test .form-actions--taylor .btn {
+  .page.new-test .form-actions--taylor .btn,
+  .page.quick-check .form-actions--taylor .btn {
     flex: 1 1 auto;
     min-height: 48px;
     font-size: 1rem;
   }
 
-  .page.new-test .form-actions--taylor .btn--ghost {
+  .page.new-test .form-actions--taylor .btn--ghost,
+  .page.quick-check .form-actions--taylor .btn--ghost {
     flex: 0 1 auto;
     min-width: 7rem;
   }
@@ -4413,7 +4424,7 @@ a:hover {
     max-width: none;
     width: 100%;
     padding: 1.25rem;
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--mobile-bottom-nav-height) + 0.5rem);
   }
 
   .btn {
@@ -4455,12 +4466,14 @@ a:hover {
 
   .bottom-nav__scroll {
     display: flex;
+    align-items: stretch;
     width: 100%;
+    min-height: var(--mobile-bottom-nav-bar);
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    padding: 0.35rem 0.25rem;
-    padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
+    padding: 0.5rem 0.35rem 0;
+    padding-bottom: var(--mobile-bottom-nav-safe);
   }
 
   .bottom-nav__scroll::-webkit-scrollbar {
@@ -4472,31 +4485,57 @@ a:hover {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.15rem;
+    gap: 0.35rem;
     flex: 0 0 auto;
-    min-width: 4.5rem;
-    padding: 0.5rem 0.65rem;
-    min-height: 48px;
-    font-size: 0.65rem;
+    position: relative;
+    min-width: 4.25rem;
+    min-height: 3.75rem;
+    padding: 0.5rem 0.7rem;
+    font-size: 1rem;
     color: var(--text-muted);
     text-decoration: none;
     font-weight: 600;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .bottom-nav__icon {
-    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    font-size: 2rem;
     line-height: 1;
+    border-radius: var(--radius-sm);
+    transition: background-color 0.15s ease;
   }
 
   .bottom-nav__label {
-    font-size: 0.62rem;
+    font-size: 1rem;
     line-height: 1.1;
     text-align: center;
     white-space: nowrap;
+    font-weight: 600;
   }
 
   .bottom-nav__link--active {
     color: var(--teal-deep);
+  }
+
+  .bottom-nav__link--active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2.5rem;
+    height: 0.2rem;
+    background: var(--teal-deep);
+    border-radius: 0 0 4px 4px;
+  }
+
+  .bottom-nav__link--active .bottom-nav__icon {
+    background: rgba(11, 115, 119, 0.12);
   }
 }
 

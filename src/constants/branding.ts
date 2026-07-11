@@ -5,7 +5,10 @@ export const BRAND = {
   logos: {
     /** Transparent background — sidebar, loading screen, dark/teal surfaces */
     transparent: '/assets/logos/logo%20transparent.png',
-    /** Solid white background — reports, favicon, light surfaces */
+    /** Solid white background — reports, light surfaces */
     solid: '/assets/logos/logo.png',
   },
+  /** Simplified icon for favicon / PWA (no small text) */
+  pwaIcon: '/icons/icon-192x192.png',
+  themeColor: '#0b7377',
 } as const;

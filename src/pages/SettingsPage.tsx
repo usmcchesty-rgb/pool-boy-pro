@@ -15,7 +15,7 @@ import {
 import { ProfileTargetRanges } from '../components/settings/ProfileTargetRanges';
 import { PageHeader } from '../components/layout/PageHeader';
 import { APP_DISPLAY_VERSION } from '../constants/appVersion';
-import { isDeveloperMode, enableDeveloperMode } from '../strip/calibration/devMode';
+import { isDeveloperMode, enableDeveloperMode, disableDeveloperMode } from '../strip/calibration/devMode';
 import { getActiveAnchorInfo, invalidateAnchorCache } from '../strip/calibration/anchorProvider';
 import {
   clearImportedCalibration,
@@ -414,8 +414,13 @@ export function SettingsPage() {
           const next = versionTaps + 1;
           setVersionTaps(next);
           if (next >= 7) {
-            enableDeveloperMode();
-            setDevMode(true);
+            if (devMode) {
+              disableDeveloperMode();
+              setDevMode(false);
+            } else {
+              enableDeveloperMode();
+              setDevMode(true);
+            }
             setVersionTaps(0);
           }
         }}

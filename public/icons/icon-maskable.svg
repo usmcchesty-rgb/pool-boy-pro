@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Pool Boy Pro">
+  <rect width="512" height="512" fill="#0b7377"/>
+  <g transform="translate(256 256) scale(0.78) translate(-256 -256)">
+    <path
+      d="M256 108c-42 58-54 82-54 118 0 40 24 72 54 92 30-20 54-52 54-92 0-36-12-60-54-118z"
+      fill="#ffffff"
+    />
+    <ellipse cx="256" cy="318" rx="148" ry="44" fill="none" stroke="#ffffff" stroke-width="26" opacity="0.92"/>
+    <ellipse cx="256" cy="318" rx="96" ry="28" fill="none" stroke="#ffffff" stroke-width="20" opacity="0.88"/>
+    <circle cx="368" cy="144" r="34" fill="#ff6b4a"/>
+  </g>
+</svg>

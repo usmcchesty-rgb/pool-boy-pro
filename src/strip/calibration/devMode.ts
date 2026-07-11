@@ -2,12 +2,14 @@ const DEV_MODE_KEY = 'poolBoyPro_developerMode';
 
 /** Developer mode unlocks hidden calibration/validation tools */
 export function isDeveloperMode(): boolean {
-  if (import.meta.env.DEV) return true;
   try {
-    return localStorage.getItem(DEV_MODE_KEY) === 'true';
+    const stored = localStorage.getItem(DEV_MODE_KEY);
+    if (stored === 'false') return false;
+    if (stored === 'true') return true;
   } catch {
-    return false;
+    // fall through
   }
+  return import.meta.env.DEV;
 }
 
 export function enableDeveloperMode(): void {
@@ -15,5 +17,5 @@ export function enableDeveloperMode(): void {
 }
 
 export function disableDeveloperMode(): void {
-  localStorage.removeItem(DEV_MODE_KEY);
+  localStorage.setItem(DEV_MODE_KEY, 'false');
 }
