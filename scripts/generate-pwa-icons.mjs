@@ -1,6 +1,6 @@
 /**
- * Generate PWA and favicon PNGs from the official Pool Boy Pro transparent logo.
- * Run: npm run icons
+ * Generate PWA and favicon PNGs from public/assets/logos/logo transparent.png.
+ * Regenerate after updating official logo files: npm run icons
  */
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
