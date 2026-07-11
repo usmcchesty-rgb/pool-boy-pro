@@ -13,10 +13,13 @@ const iconsDir = join(root, 'public', 'icons');
 const logoPath = join(root, 'public', 'assets', 'logos', 'logo transparent.png');
 const brandTeal = '#0b7377';
 
-/** Padding on each edge as a fraction of canvas size (room for iOS rounded icon mask). */
-const STANDARD_PADDING = 0.1;
-/** Extra padding for Android maskable safe zone. */
-const MASKABLE_PADDING = 0.14;
+/**
+ * Logo scale targets (contain fit, centered, aspect ratio preserved):
+ * - Standard / Apple / favicon: ~93% of canvas (3.5% margin per edge for iOS rounded mask)
+ * - Maskable Android: ~80% of canvas (10% margin per edge — max within safe-zone guidelines)
+ */
+const STANDARD_PADDING = 0.035;
+const MASKABLE_PADDING = 0.1;
 
 const sizes = [
   { name: 'favicon-16x16.png', size: 16 },
