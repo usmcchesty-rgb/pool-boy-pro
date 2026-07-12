@@ -2,12 +2,51 @@ import type { StripCaptureQuality } from '../../models/types';
 import { meanLuminance } from './colorScience';
 import type { QualityAssessment, QualityStatus } from './types';
 
-const THRESHOLDS = {
-  minFocus: 0.35,
-  minLighting: 0.45,
-  minAlignment: 0.4,
-  minStability: 0.65,
+export interface QualityThresholds {
+  minFocus: number;
+  minLighting: number;
+  minAlignment: number;
+  minStability: number;
+  /** Below these values the frame is genuinely unusable */
+  blockLighting: number;
+  blockFocus: number;
+  blockAlignment: number;
+  usableAlignment: number;
+  usableFocus: number;
+  usableLighting: number;
+}
+
+/** Stricter checks when relaxed mode is off */
+export const STRICT_THRESHOLDS: QualityThresholds = {
+  minFocus: 0.28,
+  minLighting: 0.35,
+  minAlignment: 0.32,
+  minStability: 0.55,
+  blockLighting: 0.1,
+  blockFocus: 0.06,
+  blockAlignment: 0.08,
+  usableAlignment: 0.22,
+  usableFocus: 0.2,
+  usableLighting: 0.28,
 };
+
+/** Recommended — favors usability; every scan is manually verified */
+export const RELAXED_THRESHOLDS: QualityThresholds = {
+  minFocus: 0.12,
+  minLighting: 0.18,
+  minAlignment: 0.15,
+  minStability: 0.3,
+  blockLighting: 0.08,
+  blockFocus: 0.05,
+  blockAlignment: 0.06,
+  usableAlignment: 0.12,
+  usableFocus: 0.1,
+  usableLighting: 0.15,
+};
+
+export function getQualityThresholds(relaxed = true): QualityThresholds {
+  return relaxed ? RELAXED_THRESHOLDS : STRICT_THRESHOLDS;
+}
 
 /** Laplacian variance on grayscale guide region — proxy for focus/sharpness */
 export function computeFocusScore(imageData: ImageData, gx: number, gy: number, gw: number, gh: number): number {
@@ -44,17 +83,18 @@ export function computeFocusScore(imageData: ImageData, gx: number, gy: number, 
   if (count === 0) return 0;
   const mean = sum / count;
   const variance = sumSq / count - mean * mean;
-  return Math.min(1, variance / 500);
+  // Softer normalization — indoor / slight blur still scores reasonably
+  return Math.min(1, variance / 320);
 }
 
 /** Lighting score from mean luminance — penalize too dark or clipped */
 export function computeLightingScore(imageData: ImageData): number {
   const lum = meanLuminance(imageData.data);
-  if (lum < 0.15) return lum / 0.15 * 0.4;
-  if (lum > 0.85) return Math.max(0, 1 - (lum - 0.85) * 4);
-  if (lum >= 0.25 && lum <= 0.75) return 1;
-  if (lum < 0.25) return 0.4 + (lum - 0.15) / 0.1 * 0.6;
-  return 1 - (lum - 0.75) / 0.1 * 0.4;
+  if (lum < 0.1) return lum / 0.1 * 0.35;
+  if (lum > 0.9) return Math.max(0, 1 - (lum - 0.9) * 5);
+  if (lum >= 0.18 && lum <= 0.82) return 1;
+  if (lum < 0.18) return 0.45 + (lum - 0.1) / 0.08 * 0.55;
+  return 1 - (lum - 0.82) / 0.08 * 0.35;
 }
 
 /** Color variance in guide — proxy for strip alignment */
@@ -106,38 +146,75 @@ export function computeAlignmentScore(
   for (const l of samples) lumVar += (l - lumMean) ** 2;
   lumVar /= samples.length;
 
-  const spreadScore = Math.min(1, colorSpread / 40);
-  const varScore = Math.min(1, lumVar / 800);
+  const spreadScore = Math.min(1, colorSpread / 32);
+  const varScore = Math.min(1, lumVar / 600);
   return spreadScore * 0.5 + varScore * 0.5;
 }
 
 /** Frame-to-frame stability from mean luminance delta */
 export function computeStabilityScore(currentLum: number, previousLums: number[]): number {
-  if (previousLums.length === 0) return 0.5;
+  if (previousLums.length === 0) return 0.65;
   const recent = previousLums.slice(-8);
   const avgDelta =
     recent.reduce((sum, prev) => sum + Math.abs(currentLum - prev), 0) / recent.length;
-  if (avgDelta < 0.005) return 1;
-  if (avgDelta < 0.015) return 0.85;
-  if (avgDelta < 0.03) return 0.65;
-  if (avgDelta < 0.06) return 0.4;
-  return 0.2;
+  if (avgDelta < 0.006) return 1;
+  if (avgDelta < 0.018) return 0.88;
+  if (avgDelta < 0.035) return 0.72;
+  if (avgDelta < 0.07) return 0.52;
+  if (avgDelta < 0.12) return 0.35;
+  return 0.18;
+}
+
+export interface AssessQualityOptions {
+  /** Use relaxed thresholds (recommended for real-world phone scanning) */
+  relaxQuality?: boolean;
+}
+
+function isBlockingQuality(scores: StripCaptureQuality, t: QualityThresholds): boolean {
+  return (
+    scores.lightingScore < t.blockLighting ||
+    scores.focusScore < t.blockFocus ||
+    scores.alignmentScore < t.blockAlignment
+  );
+}
+
+function isStripInsideGuide(scores: StripCaptureQuality, t: QualityThresholds): boolean {
+  return scores.alignmentScore >= t.minAlignment;
 }
 
 export function assessQuality(
   scores: StripCaptureQuality,
-  stripDetected = false
+  stripDetected = false,
+  options: AssessQualityOptions = {}
 ): QualityAssessment {
-  const hasUsableFrame =
-    stripDetected ||
-    scores.alignmentScore >= 0.28 ||
-    (scores.focusScore >= 0.25 && scores.lightingScore >= 0.35);
+  const relaxed = options.relaxQuality !== false;
+  const t = getQualityThresholds(relaxed);
+  const blocking = isBlockingQuality(scores, t);
 
-  const ready =
-    (stripDetected || scores.alignmentScore >= THRESHOLDS.minAlignment) &&
-    scores.lightingScore >= THRESHOLDS.minLighting &&
-    scores.focusScore >= THRESHOLDS.minFocus &&
-    scores.stabilityScore >= THRESHOLDS.minStability;
+  const hasUsableFrame =
+    !blocking &&
+    (stripDetected ||
+      scores.alignmentScore >= t.usableAlignment ||
+      (scores.focusScore >= t.usableFocus && scores.lightingScore >= t.usableLighting));
+
+  const ready = (() => {
+    if (blocking || !hasUsableFrame) return false;
+
+    if (stripDetected) {
+      return (
+        scores.stabilityScore >= t.minStability &&
+        scores.lightingScore >= t.blockLighting &&
+        scores.focusScore >= t.blockFocus
+      );
+    }
+
+    return (
+      isStripInsideGuide(scores, t) &&
+      scores.lightingScore >= t.minLighting &&
+      scores.focusScore >= t.minFocus &&
+      scores.stabilityScore >= t.minStability
+    );
+  })();
 
   let status: QualityStatus;
   let message: string;
@@ -145,28 +222,36 @@ export function assessQuality(
   if (ready) {
     status = 'ready';
     message = 'Ready';
-  } else if (!stripDetected && scores.alignmentScore < 0.2) {
-    status = 'searching';
-    message = 'Looking for strip';
-  } else if (!stripDetected && scores.alignmentScore < THRESHOLDS.minAlignment) {
-    status = 'closer';
-    message = 'Move closer';
-  } else if (scores.lightingScore < THRESHOLDS.minLighting) {
+  } else if (blocking && scores.lightingScore < t.blockLighting) {
     status = 'lighting';
     message = 'More light needed';
-  } else if (scores.alignmentScore < THRESHOLDS.minAlignment) {
-    status = 'align';
-    message = 'Center strip in guide';
-  } else {
+  } else if (!stripDetected && scores.alignmentScore < t.usableAlignment) {
+    status = 'searching';
+    message = 'Looking for strip';
+  } else if (!stripDetected && scores.alignmentScore < t.minAlignment) {
+    status = 'closer';
+    message = 'Move closer';
+  } else if (stripDetected && scores.stabilityScore < t.minStability) {
     status = 'steady';
     message = 'Hold steady';
+  } else if (stripDetected || scores.lightingScore >= t.minLighting) {
+    status = 'steady';
+    message = relaxed ? 'Looking good' : 'Hold steady';
+  } else if (scores.lightingScore >= t.usableLighting) {
+    status = 'steady';
+    message = 'Lighting OK';
+  } else {
+    status = 'align';
+    message = relaxed ? 'Looking good' : 'Center strip in guide';
   }
 
   return { scores, status, message, ready, hasUsableFrame, stripDetected };
 }
 
-export function getDefaultThresholds() {
-  return { ...THRESHOLDS, stableFrameCount: 8 };
+export function getDefaultThresholds(relaxed = true) {
+  const t = getQualityThresholds(relaxed);
+  return { ...t, stableFrameCount: 8 };
 }
 
-export { THRESHOLDS };
+/** @deprecated Use getQualityThresholds */
+export const THRESHOLDS = STRICT_THRESHOLDS;

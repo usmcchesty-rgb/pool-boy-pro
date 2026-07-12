@@ -32,6 +32,7 @@ describe('cameraSession', () => {
     const stop = vi.fn();
     const stream = {
       getTracks: () => [{ stop }],
+      getVideoTracks: () => [{ stop }],
       active: true,
     } as unknown as MediaStream;
     setActiveCameraStream(stream);

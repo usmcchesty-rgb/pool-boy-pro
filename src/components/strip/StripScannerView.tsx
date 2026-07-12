@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react';
+import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
 import { StripAlignmentOverlay } from './StripAlignmentOverlay';
 import { StripQualityIndicators } from './StripQualityIndicators';
 import { StripPrivacyNotice } from './StripPrivacyNotice';
+import { isDeveloperMode } from '../../strip/calibration/devMode';
 import {
   startCameraSession,
   stopAllTracks,
@@ -29,6 +31,13 @@ import {
   resetAutoCaptureState,
   tickAutoCapture,
 } from '../../strip/scanner/autoCapture';
+import {
+  detectTorchSupport,
+  getVideoTrack,
+  releaseTorch,
+  setTorchEnabled,
+  type TorchSupport,
+} from '../../strip/scanner/torchControl';
 import type { PadMatchResult, ScanProcessResult } from '../../strip/scanner/types';
 import type { ScanCapturePackage } from '../../strip/scanner/scanProcessor';
 import type { SessionCalibrationState } from '../../strip/scanner/sessionCalibration';
@@ -67,6 +76,10 @@ export const StripScannerView = forwardRef<StripScannerHandle, StripScannerViewP
     },
     ref
   ) {
+    const { settings } = useApp();
+    const relaxQuality = settings.scannerRelaxQuality !== false;
+    const devMode = isDeveloperMode();
+
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -87,18 +100,46 @@ export const StripScannerView = forwardRef<StripScannerHandle, StripScannerViewP
     const [qualityStatus, setQualityStatus] = useState<
       'searching' | 'closer' | 'align' | 'lighting' | 'steady' | 'ready'
     >('searching');
+    const [torchSupport, setTorchSupport] = useState<TorchSupport>('unknown');
+    const [torchOn, setTorchOn] = useState(false);
 
     const config = getScanTargetConfig(phase);
 
     const stopCamera = useCallback(() => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
+      void releaseTorch(streamRef.current);
       stopAllTracks(streamRef.current);
       streamRef.current = null;
+      setTorchOn(false);
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
     }, []);
+
+    const initTorchForStream = useCallback(
+      async (stream: MediaStream) => {
+        const track = getVideoTrack(stream);
+        const support = detectTorchSupport(track);
+        setTorchSupport(support);
+        if (support !== 'supported') {
+          setTorchOn(false);
+          return;
+        }
+        const wantOn = settings.scannerAutoFlashlight;
+        const applied = await setTorchEnabled(track, wantOn);
+        setTorchOn(applied && wantOn);
+      },
+      [settings.scannerAutoFlashlight]
+    );
+
+    const toggleTorch = useCallback(async () => {
+      const track = getVideoTrack(streamRef.current);
+      if (!track || torchSupport !== 'supported') return;
+      const next = !torchOn;
+      const applied = await setTorchEnabled(track, next);
+      if (applied) setTorchOn(next);
+    }, [torchOn, torchSupport]);
 
     const handleCapture = useCallback(() => {
       const video = videoRef.current;
@@ -147,7 +188,7 @@ export const StripScannerView = forwardRef<StripScannerHandle, StripScannerViewP
           lumsRef.current.push(live.lum);
           if (lumsRef.current.length > 16) lumsRef.current.shift();
 
-          const assessment = assessQuality(live.quality, live.stripDetected);
+          const assessment = assessQuality(live.quality, live.stripDetected, { relaxQuality });
           setQuality(live.quality);
           setQualityStatus(assessment.status);
           setStatusMessage(assessment.message);
@@ -172,9 +213,8 @@ export const StripScannerView = forwardRef<StripScannerHandle, StripScannerViewP
 
         rafRef.current = requestAnimationFrame(tick);
       };
-
       rafRef.current = requestAnimationFrame(tick);
-    }, [config, handleCapture, onCaptureStateChange, scanAllowed]);
+    }, [config, handleCapture, onCaptureStateChange, scanAllowed, relaxQuality]);
 
     const initCamera = useCallback(async () => {
       setStarting(true);
@@ -198,6 +238,7 @@ export const StripScannerView = forwardRef<StripScannerHandle, StripScannerViewP
         if (video) {
           video.srcObject = existing;
           await video.play();
+          await initTorchForStream(existing);
           setStatusMessage('Looking for strip');
           setStarting(false);
           startLoop();
@@ -224,6 +265,7 @@ export const StripScannerView = forwardRef<StripScannerHandle, StripScannerViewP
         if (video) {
           video.srcObject = session.stream;
           await video.play();
+          await initTorchForStream(session.stream);
           setStatusMessage('Looking for strip');
           startLoop();
         }
@@ -234,7 +276,7 @@ export const StripScannerView = forwardRef<StripScannerHandle, StripScannerViewP
       } finally {
         setStarting(false);
       }
-    }, [startLoop]);
+    }, [initTorchForStream, startLoop]);
 
     useEffect(() => {
       void initCamera();
@@ -298,7 +340,21 @@ export const StripScannerView = forwardRef<StripScannerHandle, StripScannerViewP
             </div>
           )}
         </div>
-        <StripQualityIndicators scores={quality} status={qualityStatus} />
+        {torchSupport === 'supported' ? (
+          <div className="strip-scanner__torch">
+            <Button
+              variant={torchOn ? 'primary' : 'secondary'}
+              onClick={() => void toggleTorch()}
+              type="button"
+              size="sm"
+            >
+              {torchOn ? 'Flashlight On' : 'Flashlight Off'}
+            </Button>
+          </div>
+        ) : torchSupport === 'unsupported' ? (
+          <p className="strip-scanner__torch-hint field__hint">Flashlight unavailable on this device</p>
+        ) : null}
+        {devMode && <StripQualityIndicators scores={quality} status={qualityStatus} showRawScores />}
         {!scanAllowed && timingBlockedMessage && (
           <p className="strip-scanner__timing-block" role="status">{timingBlockedMessage}</p>
         )}

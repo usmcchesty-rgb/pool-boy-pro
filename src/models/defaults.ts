@@ -29,6 +29,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   preferredTaEntryMode: 'drops',
   preferredChEntryMode: 'drops',
   poolProfile: { ...DEFAULT_POOL_PROFILE },
+  scannerAutoFlashlight: false,
+  scannerRelaxQuality: true,
 };
 
 export const DEFAULT_POOL_INFO: PoolInfo = {

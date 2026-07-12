@@ -1,3 +1,5 @@
+import { releaseTorch } from './torchControl';
+
 export type CameraErrorCode =
   | 'unsupported'
   | 'permission_denied'
@@ -96,6 +98,7 @@ export function setActiveCameraStream(stream: MediaStream | null): void {
 }
 
 export function releaseActiveCameraStream(): void {
+  void releaseTorch(activeStream);
   stopAllTracks(activeStream);
   activeStream = null;
 }

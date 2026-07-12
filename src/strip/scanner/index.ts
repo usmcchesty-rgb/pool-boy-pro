@@ -9,4 +9,5 @@ export * from './cameraSession';
 export * from './stripGeometry';
 export * from './temporaryPreview';
 export * from './stripDetector';
+export * from './torchControl';
 export * from './types';

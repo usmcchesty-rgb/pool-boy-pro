@@ -250,6 +250,10 @@ export interface AppSettings {
   preferredChEntryMode: TaylorEntryMode;
   /** Chemistry profile — drives analysis thresholds and dosing targets */
   poolProfile: PoolProfileConfig;
+  /** Automatically enable flashlight while Quick Test scanning */
+  scannerAutoFlashlight: boolean;
+  /** Use relaxed scanner quality checks (recommended) */
+  scannerRelaxQuality: boolean;
 }
 
 export interface AppData {

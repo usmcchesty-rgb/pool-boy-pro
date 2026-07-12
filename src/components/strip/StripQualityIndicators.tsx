@@ -4,6 +4,8 @@ import type { QualityStatus } from '../../strip/scanner/types';
 interface StripQualityIndicatorsProps {
   scores: StripCaptureQuality | null;
   status: QualityStatus;
+  /** Show numeric bars — developer mode only */
+  showRawScores?: boolean;
 }
 
 const LABELS: Record<keyof StripCaptureQuality, string> = {
@@ -13,8 +15,8 @@ const LABELS: Record<keyof StripCaptureQuality, string> = {
   stabilityScore: 'Stability',
 };
 
-export function StripQualityIndicators({ scores, status }: StripQualityIndicatorsProps) {
-  if (!scores) return null;
+export function StripQualityIndicators({ scores, status, showRawScores = false }: StripQualityIndicatorsProps) {
+  if (!scores || !showRawScores) return null;
 
   const items = (Object.keys(LABELS) as (keyof StripCaptureQuality)[]).map((key) => ({
     key,
