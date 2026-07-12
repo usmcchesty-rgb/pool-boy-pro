@@ -11,6 +11,9 @@ function createEmptyProfile(): AdaptiveLearningProfile {
     enabled: true,
     calibrationVersion: 'adaptive-v1',
     lastUpdated: new Date().toISOString(),
+    verifiedScanCount: 0,
+    verifiedScanSessionIds: [],
+    dateLastImproved: null,
     samples: [],
     rejectedOutlierCount: 0,
     falseHighConfidenceCount: 0,
@@ -22,9 +25,18 @@ function createEmptyProfile(): AdaptiveLearningProfile {
 }
 
 function migrateProfile(parsed: AdaptiveLearningProfile): AdaptiveLearningProfile {
+  const sessionIds = parsed.verifiedScanSessionIds ?? [];
+  const legacyScanCount =
+    sessionIds.length > 0
+      ? sessionIds.length
+      : new Set(parsed.samples.map((s) => s.scanSessionId).filter(Boolean)).size;
+
   return {
     ...createEmptyProfile(),
     ...parsed,
+    verifiedScanCount: parsed.verifiedScanCount ?? legacyScanCount,
+    verifiedScanSessionIds: sessionIds.length > 0 ? sessionIds : [...new Set(parsed.samples.map((s) => s.scanSessionId).filter(Boolean))],
+    dateLastImproved: parsed.dateLastImproved ?? (parsed.samples.length > 0 ? parsed.lastUpdated : null),
     totalRejectedSamples: parsed.totalRejectedSamples ?? 0,
     activityLog: parsed.activityLog ?? [],
     rollbackRecords: parsed.rollbackRecords ?? [],
@@ -44,6 +56,20 @@ export function isAdaptiveLearningEnabled(): boolean {
 
 export function setAdaptiveLearningEnabled(enabled: boolean): void {
   localStorage.setItem(ENABLED_KEY, enabled ? 'true' : 'false');
+}
+
+/** Pause adaptive learning — samples are retained, no new learning applied */
+export function pauseAdaptiveLearning(): void {
+  setAdaptiveLearningEnabled(false);
+}
+
+/** Resume adaptive learning from stored profile */
+export function resumeAdaptiveLearning(): void {
+  setAdaptiveLearningEnabled(true);
+}
+
+export function isAdaptiveLearningPaused(): boolean {
+  return !isAdaptiveLearningEnabled();
 }
 
 export function loadAdaptiveProfile(): AdaptiveLearningProfile {

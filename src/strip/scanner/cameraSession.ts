@@ -41,7 +41,10 @@ export async function startCameraSession(
 
     return {
       stream,
-      stop: () => stopAllTracks(stream),
+      stop: () => {
+        stopAllTracks(stream);
+        if (activeStream === stream) activeStream = null;
+      },
     };
   } catch (err) {
     const domErr = err as DOMException;
@@ -70,10 +73,29 @@ export function getCameraErrorMessage(code: CameraErrorCode): string {
     case 'unsupported':
       return 'Your browser does not support camera access. Use manual entry instead.';
     case 'permission_denied':
-      return 'Camera permission was denied. Allow camera access or use manual entry.';
+      return 'Camera permission was denied. Allow camera access in your browser settings, or use manual entry.';
     case 'not_found':
       return 'No camera was found on this device. Use manual entry instead.';
     default:
       return 'Could not start the camera. Try again or use manual entry.';
   }
+}
+
+/** Shared camera stream — reused within a scanner session */
+let activeStream: MediaStream | null = null;
+
+export function getActiveCameraStream(): MediaStream | null {
+  return activeStream;
+}
+
+export function setActiveCameraStream(stream: MediaStream | null): void {
+  if (activeStream && activeStream !== stream) {
+    stopAllTracks(activeStream);
+  }
+  activeStream = stream;
+}
+
+export function releaseActiveCameraStream(): void {
+  stopAllTracks(activeStream);
+  activeStream = null;
 }

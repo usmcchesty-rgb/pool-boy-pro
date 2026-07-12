@@ -124,9 +124,17 @@ export function computeStabilityScore(currentLum: number, previousLums: number[]
   return 0.2;
 }
 
-export function assessQuality(scores: StripCaptureQuality): QualityAssessment {
+export function assessQuality(
+  scores: StripCaptureQuality,
+  stripDetected = false
+): QualityAssessment {
+  const hasUsableFrame =
+    stripDetected ||
+    scores.alignmentScore >= 0.28 ||
+    (scores.focusScore >= 0.25 && scores.lightingScore >= 0.35);
+
   const ready =
-    scores.alignmentScore >= THRESHOLDS.minAlignment &&
+    (stripDetected || scores.alignmentScore >= THRESHOLDS.minAlignment) &&
     scores.lightingScore >= THRESHOLDS.minLighting &&
     scores.focusScore >= THRESHOLDS.minFocus &&
     scores.stabilityScore >= THRESHOLDS.minStability;
@@ -136,19 +144,25 @@ export function assessQuality(scores: StripCaptureQuality): QualityAssessment {
 
   if (ready) {
     status = 'ready';
-    message = 'Ready — Hold Still';
-  } else if (scores.alignmentScore < THRESHOLDS.minAlignment) {
-    status = 'align';
-    message = 'Move strip into guide';
+    message = 'Ready';
+  } else if (!stripDetected && scores.alignmentScore < 0.2) {
+    status = 'searching';
+    message = 'Looking for strip';
+  } else if (!stripDetected && scores.alignmentScore < THRESHOLDS.minAlignment) {
+    status = 'closer';
+    message = 'Move closer';
   } else if (scores.lightingScore < THRESHOLDS.minLighting) {
     status = 'lighting';
     message = 'More light needed';
+  } else if (scores.alignmentScore < THRESHOLDS.minAlignment) {
+    status = 'align';
+    message = 'Center strip in guide';
   } else {
     status = 'steady';
     message = 'Hold steady';
   }
 
-  return { scores, status, message, ready };
+  return { scores, status, message, ready, hasUsableFrame, stripDetected };
 }
 
 export function getDefaultThresholds() {

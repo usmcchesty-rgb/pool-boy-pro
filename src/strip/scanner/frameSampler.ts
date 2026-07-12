@@ -62,14 +62,14 @@ export function sampleNeutralReference(
   return samplePadRegion(imageData, guideX, guideY, guideW, guideH, roi);
 }
 
-/** Compute guide box dimensions centered in the frame */
+/** Compute guide box dimensions centered in the frame — large whole-strip outline */
 export function computeGuideRect(
   frameWidth: number,
   frameHeight: number,
   aspectRatio: number
 ): { x: number; y: number; w: number; h: number } {
-  const maxH = frameHeight * 0.75;
-  const maxW = frameWidth * 0.55;
+  const maxH = frameHeight * 0.82;
+  const maxW = frameWidth * 0.72;
   let h = maxH;
   let w = h * aspectRatio;
   if (w > maxW) {

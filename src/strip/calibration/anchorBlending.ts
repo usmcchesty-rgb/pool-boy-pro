@@ -1,6 +1,10 @@
 import { rgbToLab, type Lab, type Rgb } from '../scanner/colorScience';
 import { ADAPTIVE_LEARNING_THRESHOLDS } from './adaptiveConfig';
 import type { LearnedAnchorState, VerifiedPadSample } from './adaptiveTypes';
+import {
+  computePhaseLearnedWeight,
+  type LearningPhase,
+} from './learningPhases';
 
 const T = ADAPTIVE_LEARNING_THRESHOLDS;
 
@@ -8,13 +12,12 @@ function labDistance(a: Lab, b: Lab): number {
   return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
 }
 
-/** Compute learned weight from reliable sample count */
-export function computeLearnedWeight(reliableSampleCount: number): number {
-  if (reliableSampleCount < T.minSamplesForBlend) return 0;
-  if (reliableSampleCount < T.minSamplesForStrong) return T.lightBlendWeight;
-  const extra = reliableSampleCount - T.minSamplesForStrong;
-  const t = Math.min(1, extra / 5);
-  return T.lightBlendWeight + t * (T.maxLearnedWeight - T.lightBlendWeight);
+/** Compute learned weight from reliable sample count and learning phase */
+export function computeLearnedWeight(
+  reliableSampleCount: number,
+  phase: LearningPhase = 2
+): number {
+  return computePhaseLearnedWeight(reliableSampleCount, phase);
 }
 
 /** Weighted median of RGB channels */
@@ -110,12 +113,13 @@ export function computeLearnedAnchorState(
   value: number,
   samples: VerifiedPadSample[],
   baselineRgb: Rgb,
-  previousRejected = 0
+  previousRejected = 0,
+  phase: LearningPhase = 2
 ): { state: LearnedAnchorState; rejectedCount: number } {
   const padSamples = samples.filter((s) => s.padId === padId && s.confirmedValue === value);
   const { accepted, rejectedCount } = filterOutliers(padSamples);
   const reliableSampleCount = accepted.reduce((s, x) => s + (x.reliabilityWeight >= 0.5 ? 1 : 0.5), 0);
-  const learnedWeight = computeLearnedWeight(Math.floor(reliableSampleCount));
+  const learnedWeight = computeLearnedWeight(Math.floor(reliableSampleCount), phase);
   const varianceLab = Math.sqrt(computeVarianceLab(accepted));
 
   if (learnedWeight === 0 || accepted.length === 0) {

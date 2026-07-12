@@ -138,6 +138,14 @@ export function validateAdaptiveImport(raw: unknown): {
 
   if (errors.length > 0) return { valid: false, errors };
 
+  const sessionIds = [
+    ...new Set(samples.map((s) => s.scanSessionId).filter(Boolean)),
+  ];
+  const verifiedScanCount =
+    typeof data.verifiedScanCount === 'number'
+      ? data.verifiedScanCount
+      : sessionIds.length;
+
   return {
     valid: true,
     errors: [],
@@ -148,6 +156,16 @@ export function validateAdaptiveImport(raw: unknown): {
       calibrationVersion:
         typeof data.calibrationVersion === 'string' ? data.calibrationVersion : 'imported',
       lastUpdated: typeof data.lastUpdated === 'string' ? data.lastUpdated : new Date().toISOString(),
+      verifiedScanCount,
+      verifiedScanSessionIds: Array.isArray(data.verifiedScanSessionIds)
+        ? (data.verifiedScanSessionIds as string[])
+        : sessionIds,
+      dateLastImproved:
+        typeof data.dateLastImproved === 'string'
+          ? data.dateLastImproved
+          : samples.length > 0
+            ? (typeof data.lastUpdated === 'string' ? data.lastUpdated : new Date().toISOString())
+            : null,
       samples,
       rejectedOutlierCount:
         typeof data.rejectedOutlierCount === 'number' ? data.rejectedOutlierCount : 0,

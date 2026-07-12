@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useImperativeHandle, forwardRef, useEffect } from 'react';
 import { Button } from '../ui/Button';
 import { StripPadPicker } from './StripPadPicker';
 import { StripAccuracyBadge } from './TestSourceBadge';
@@ -6,6 +6,7 @@ import type { StripBrandDefinition, StripPadSelections } from '../../strip/types
 import type { PadMatchResult } from '../../strip/scanner/types';
 import { confidenceToLevel } from '../../strip/scanner/colorMatcher';
 import { getActiveAnchorInfo, getActiveAnchorsForMatching } from '../../strip/calibration/anchorProvider';
+import { geometrySourceLabel } from '../../strip/scanner/stripGeometry';
 
 interface StripScanVerificationProps {
   brand: StripBrandDefinition;
@@ -15,6 +16,16 @@ interface StripScanVerificationProps {
   onRescan: (phase: 'six_way' | 'salt') => void;
   onContinue: (verifiedPadIds: Set<string>) => void;
   needsSaltScan: boolean;
+  hideActions?: boolean;
+  onCanContinueChange?: (can: boolean) => void;
+  canViewSample?: boolean;
+  onViewSample?: () => void;
+}
+
+export interface StripScanVerificationHandle {
+  canContinue: boolean;
+  continueToReview: () => void;
+  rescan: () => void;
 }
 
 function rgbToCss(rgb: [number, number, number]): string {
@@ -22,18 +33,30 @@ function rgbToCss(rgb: [number, number, number]): string {
 }
 
 function needsExplicitConfirmation(match: PadMatchResult): boolean {
-  return match.confidenceLevel === 'low' || match.ambiguous === true;
+  return (
+    match.confidenceLevel === 'low' ||
+    match.ambiguous === true ||
+    match.lowGeometryConfidence === true
+  );
 }
 
-export function StripScanVerification({
-  brand,
-  matches,
-  selections,
-  onChange,
-  onRescan,
-  onContinue,
-  needsSaltScan,
-}: StripScanVerificationProps) {
+export const StripScanVerification = forwardRef<StripScanVerificationHandle, StripScanVerificationProps>(
+  function StripScanVerification(
+    {
+      brand,
+      matches,
+      selections,
+      onChange,
+      onRescan,
+      onContinue,
+      needsSaltScan,
+      hideActions = false,
+      onCanContinueChange,
+      canViewSample = false,
+      onViewSample,
+    },
+    ref
+  ) {
   const [confirmedPads, setConfirmedPads] = useState<Set<string>>(new Set());
   const anchorInfo = getActiveAnchorInfo();
 
@@ -44,6 +67,10 @@ export function StripScanVerification({
 
   const missingPads = brand.pads.filter((p) => selections[p.id] === undefined);
   const canContinue = missingPads.length === 0 && unresolvedPads.length === 0;
+
+  useEffect(() => {
+    onCanContinueChange?.(canContinue);
+  }, [canContinue, onCanContinueChange]);
 
   function confirmPad(padId: string) {
     setConfirmedPads((prev) => new Set(prev).add(padId));
@@ -66,12 +93,24 @@ export function StripScanVerification({
     onContinue(verified);
   }
 
+  useImperativeHandle(ref, () => ({
+    canContinue,
+    continueToReview: handleContinue,
+    rescan: () => onRescan('six_way'),
+  }), [canContinue, confirmedPads, matches, onContinue, onRescan]);
+
   return (
     <div className="strip-scan-verify">
       <p className="field__hint">
         Confirm each reading matches your strip. Scanner uses <strong>{anchorInfo.label}</strong>.
         Adjust any value using the chart picker below.
       </p>
+
+      {canViewSample && onViewSample && (
+        <Button variant="secondary" onClick={onViewSample} type="button" size="sm">
+          View Sample Area
+        </Button>
+      )}
 
       <ul className="strip-scan-verify__results">
         {matches.map((match) => {
@@ -90,6 +129,13 @@ export function StripScanVerification({
                 <StripAccuracyBadge level={displayLevel} compact />
               </div>
 
+              {match.geometrySource && (
+                <p className="strip-scan-verify__geometry field__hint">
+                  Sample source: {geometrySourceLabel(match.geometrySource)}
+                  {match.lowGeometryConfidence && ' — confirm carefully'}
+                </p>
+              )}
+
               {match.ambiguous && match.ambiguityReason && (
                 <p className="strip-scan-verify__ambiguity" role="note">
                   {match.ambiguityReason}
@@ -99,13 +145,18 @@ export function StripScanVerification({
               <div className="strip-scan-verify__match-row">
                 <span
                   className="strip-scan-verify__swatch"
+                  style={{ background: rgbToCss(match.sampledRgb) }}
+                  title="Sampled pad color"
+                />
+                <span
+                  className="strip-scan-verify__swatch strip-scan-verify__swatch--chart"
                   style={{ background: rgbToCss(match.matchedAnchorRgb) }}
                   title="Best chart match"
                 />
                 <span className="strip-scan-verify__value">
                   Best match: <strong>{match.proposedValue}</strong>
                   {pad.unit === 'ppm' ? ' ppm' : ''}
-                  <span className="field__hint"> (ΔE {match.deltaE.toFixed(1)})</span>
+                  <span className="field__hint"> ({match.confidence}% confidence, ΔE {match.deltaE.toFixed(1)})</span>
                 </span>
               </div>
 
@@ -149,14 +200,6 @@ export function StripScanVerification({
                 );
               })()}
 
-              <div className="strip-scan-verify__detected" title="Detected pad color (not stored)">
-                <span
-                  className="strip-scan-verify__swatch strip-scan-verify__swatch--detected"
-                  style={{ background: rgbToCss(match.sampledRgb) }}
-                />
-                <span className="field__hint">Detected color</span>
-              </div>
-
               {needsConfirm && !confirmed && (
                 <Button size="sm" variant="secondary" onClick={() => confirmPad(match.padId)} type="button">
                   Confirm reading
@@ -198,17 +241,19 @@ export function StripScanVerification({
         </p>
       )}
 
-      <div className="strip-scan-verify__actions">
-        <Button variant="secondary" onClick={() => onRescan('six_way')} type="button">
-          Rescan Six-Way Strip
-        </Button>
-        <Button onClick={handleContinue} disabled={!canContinue} type="button">
-          Continue to Review
-        </Button>
-      </div>
+      {!hideActions && (
+        <div className="strip-scan-verify__actions">
+          <Button variant="secondary" onClick={() => onRescan('six_way')} type="button">
+            Rescan Six-Way Strip
+          </Button>
+          <Button onClick={handleContinue} disabled={!canContinue} type="button">
+            Continue to Review
+          </Button>
+        </div>
+      )}
     </div>
   );
-}
+});
 
 export function matchesToSelections(matches: PadMatchResult[]): StripPadSelections {
   return Object.fromEntries(matches.map((m) => [m.padId, m.proposedValue]));

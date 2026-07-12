@@ -46,6 +46,12 @@ export interface AdaptiveLearningProfile {
   enabled: boolean;
   calibrationVersion: string;
   lastUpdated: string;
+  /** Unique verified scan sessions that contributed learning samples */
+  verifiedScanCount: number;
+  /** Session IDs already counted toward verifiedScanCount */
+  verifiedScanSessionIds: string[];
+  /** ISO timestamp when calibration last measurably improved */
+  dateLastImproved: string | null;
   samples: VerifiedPadSample[];
   rejectedOutlierCount: number;
   falseHighConfidenceCount: number;
@@ -125,6 +131,14 @@ export interface PadLearningProgress {
 export interface AdaptiveProfileSummary {
   enabled: boolean;
   totalSamples: number;
+  verifiedScanCount: number;
+  verifiedPadsCount: number;
+  currentPhase: number;
+  scannerConfidence: number;
+  calibrationQuality: string;
+  calibrationQualityLabel: string;
+  statusLabel: string;
+  dateLastImproved: string | null;
   calibrationVersion: string;
   lastUpdated: string;
   activeSource: AdaptiveAnchorSourceType;
@@ -133,6 +147,7 @@ export interface AdaptiveProfileSummary {
   learnedWeight: number;
   rejectedOutlierCount: number;
   falseHighConfidenceCount: number;
+  totalRejectedSamples: number;
   samplesPerPadValue: Record<string, Record<number, number>>;
   highVarianceAnchors: Array<{ padId: string; value: number; varianceLab: number }>;
   learnedAnchorCount: number;

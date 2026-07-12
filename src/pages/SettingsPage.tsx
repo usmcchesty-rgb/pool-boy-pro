@@ -13,6 +13,7 @@ import {
   POOL_SURFACE_OPTIONS,
 } from '../chemistry/poolProfiles';
 import { ProfileTargetRanges } from '../components/settings/ProfileTargetRanges';
+import { ScannerLearningSettings } from '../components/settings/ScannerLearningSettings';
 import { PageHeader } from '../components/layout/PageHeader';
 import { APP_DISPLAY_VERSION } from '../constants/appVersion';
 import { isDeveloperMode, enableDeveloperMode, disableDeveloperMode } from '../strip/calibration/devMode';
@@ -318,6 +319,8 @@ export function SettingsPage() {
             ))}
           </div>
         </Card>
+
+        <ScannerLearningSettings />
 
         <Card title="Backup & Restore">
           <div className="backup-actions">

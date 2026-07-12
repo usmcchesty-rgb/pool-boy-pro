@@ -135,17 +135,21 @@ describe('sample acceptance', () => {
 });
 
 describe('anchor blending', () => {
-  it('returns zero learned weight below minimum samples', () => {
-    expect(computeLearnedWeight(2)).toBe(0);
+  it('returns zero learned weight below minimum samples in phase 2', () => {
+    expect(computeLearnedWeight(2, 2)).toBe(0);
   });
 
-  it('returns light blend at 3 samples', () => {
-    expect(computeLearnedWeight(3)).toBe(ADAPTIVE_LEARNING_THRESHOLDS.lightBlendWeight);
+  it('returns light blend at 3 samples in phase 2', () => {
+    expect(computeLearnedWeight(3, 2)).toBe(ADAPTIVE_LEARNING_THRESHOLDS.lightBlendWeight);
   });
 
-  it('increases weight at 5+ samples', () => {
-    expect(computeLearnedWeight(6)).toBeGreaterThan(ADAPTIVE_LEARNING_THRESHOLDS.lightBlendWeight);
-    expect(computeLearnedWeight(10)).toBeLessThanOrEqual(ADAPTIVE_LEARNING_THRESHOLDS.maxLearnedWeight);
+  it('increases weight at 5+ samples in phase 2', () => {
+    expect(computeLearnedWeight(6, 2)).toBeGreaterThan(ADAPTIVE_LEARNING_THRESHOLDS.lightBlendWeight);
+    expect(computeLearnedWeight(10, 2)).toBeLessThanOrEqual(ADAPTIVE_LEARNING_THRESHOLDS.maxLearnedWeight);
+  });
+
+  it('allows earlier blending in phase 1', () => {
+    expect(computeLearnedWeight(1, 1)).toBeGreaterThan(0);
   });
 
   it('never fully discards baseline in blend', () => {
@@ -177,7 +181,7 @@ describe('anchor blending', () => {
   it('activates learned anchor only with enough samples', () => {
     const baseline: [number, number, number] = [255, 160, 190];
     const few = [makeSample([250, 155, 185]), makeSample([252, 158, 188])];
-    const { state: fewState } = computeLearnedAnchorState('freeChlorine', 3, few, baseline);
+    const { state: fewState } = computeLearnedAnchorState('freeChlorine', 3, few, baseline, 0, 2);
     expect(fewState.active).toBe(false);
 
     const many = [
@@ -186,7 +190,7 @@ describe('anchor blending', () => {
       makeSample([253, 159, 189]),
       makeSample([254, 160, 188]),
     ];
-    const { state: manyState } = computeLearnedAnchorState('freeChlorine', 3, many, baseline);
+    const { state: manyState } = computeLearnedAnchorState('freeChlorine', 3, many, baseline, 0, 2);
     expect(manyState.active).toBe(true);
   });
 });

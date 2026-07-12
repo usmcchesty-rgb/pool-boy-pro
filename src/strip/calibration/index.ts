@@ -17,3 +17,5 @@ export * from './adaptiveImport';
 export * from './adaptiveHealthConfig';
 export * from './adaptiveHealth';
 export * from './adaptiveRollback';
+export * from './learningPhases';
+export * from './learningFeedback';

@@ -13,6 +13,15 @@ import {
   computeLearnedAnchorState,
 } from './anchorBlending';
 import { assessAnchorRegression, applyRollback, getEffectiveLearnedWeight } from './adaptiveRollback';
+import {
+  CALIBRATION_QUALITY_LABELS,
+  computeCalibrationQuality,
+  computeScannerConfidence,
+  countVerifiedPads,
+  countVerifiedScans,
+  getLearningPhase,
+  getUserFriendlyStatus,
+} from './learningPhases';
 import type {
   AdaptiveLearningProfile,
   AdaptiveProfileSummary,
@@ -55,6 +64,7 @@ function getBaselineRgb(padId: string, value: number): [number, number, number] 
 /** Rebuild all learned anchor states from stored samples and run safety rollbacks */
 export function rebuildLearnedAnchors(profile?: AdaptiveLearningProfile): Map<string, LearnedAnchorState> {
   const p = profile ?? loadAdaptiveProfile();
+  const phase = getLearningPhase(countVerifiedScans(p));
   const states = new Map<string, LearnedAnchorState>();
   let totalRejected = 0;
 
@@ -65,7 +75,9 @@ export function rebuildLearnedAnchors(profile?: AdaptiveLearningProfile): Map<st
         pad.id,
         value,
         p.samples,
-        baseline
+        baseline,
+        0,
+        phase
       );
       totalRejected += rejectedCount;
       states.set(stateKey(pad.id, value), state);
@@ -154,6 +166,18 @@ export function getAdaptiveProfileSummary(): AdaptiveProfileSummary {
   const imported = loadImportedCalibration();
   const states = getLearnedStates();
   const activeLearned = [...states.values()].filter((s) => s.active);
+  const health = buildLearningHealthSummary(profile, states);
+  const verifiedScanCount = countVerifiedScans(profile);
+  const verifiedPadsCount = countVerifiedPads(profile);
+  const phase = getLearningPhase(verifiedScanCount);
+  const scannerConfidence = computeScannerConfidence({
+    profile,
+    states,
+    healthStatus: health.overallStatus,
+    falseHighCount: profile.falseHighConfidenceCount,
+  });
+  const calibrationQuality = computeCalibrationQuality(scannerConfidence);
+  const paused = !isAdaptiveLearningEnabled();
 
   let activeSource: AdaptiveProfileSummary['activeSource'] = 'builtin_approximate';
   let activeSourceLabel = 'Built-in approximate anchors';
@@ -192,6 +216,14 @@ export function getAdaptiveProfileSummary(): AdaptiveProfileSummary {
   return {
     enabled: isAdaptiveLearningEnabled(),
     totalSamples: profile.samples.length,
+    verifiedScanCount,
+    verifiedPadsCount,
+    currentPhase: phase,
+    scannerConfidence,
+    calibrationQuality,
+    calibrationQualityLabel: CALIBRATION_QUALITY_LABELS[calibrationQuality],
+    statusLabel: getUserFriendlyStatus(health.overallStatus, verifiedScanCount, paused),
+    dateLastImproved: profile.dateLastImproved,
     calibrationVersion: profile.calibrationVersion,
     lastUpdated: profile.lastUpdated,
     activeSource,
@@ -200,6 +232,7 @@ export function getAdaptiveProfileSummary(): AdaptiveProfileSummary {
     learnedWeight,
     rejectedOutlierCount: profile.rejectedOutlierCount,
     falseHighConfidenceCount: profile.falseHighConfidenceCount,
+    totalRejectedSamples: profile.totalRejectedSamples,
     samplesPerPadValue,
     highVarianceAnchors,
     learnedAnchorCount: activeLearned.length,
@@ -273,6 +306,20 @@ export function addVerifiedSamples(
 ): { added: number; profile: AdaptiveLearningProfile } {
   const profile = loadAdaptiveProfile();
   const T = ADAPTIVE_LEARNING_THRESHOLDS;
+  const beforeStates = rebuildLearnedAnchors(profile);
+  const beforeActiveWeight = [...beforeStates.values()]
+    .filter((s) => s.active)
+    .reduce((sum, s) => sum + s.learnedWeight, 0);
+
+  const newSessionIds = new Set(
+    newSamples.map((s) => s.scanSessionId).filter(Boolean)
+  );
+  for (const sessionId of newSessionIds) {
+    if (!profile.verifiedScanSessionIds.includes(sessionId)) {
+      profile.verifiedScanSessionIds.push(sessionId);
+      profile.verifiedScanCount += 1;
+    }
+  }
 
   for (const sample of newSamples) {
     const existing = profile.samples.filter(
@@ -299,7 +346,20 @@ export function addVerifiedSamples(
   appendLearningActivity(profile, newSamples, rejections, quality);
   saveAdaptiveProfile(profile);
   invalidateAdaptiveCache();
-  rebuildLearnedAnchors(profile);
+  const afterStates = rebuildLearnedAnchors(profile);
+  const afterActiveWeight = [...afterStates.values()]
+    .filter((s) => s.active)
+    .reduce((sum, s) => sum + s.learnedWeight, 0);
+  const beforeActiveCount = [...beforeStates.values()].filter((s) => s.active).length;
+  const afterActiveCount = [...afterStates.values()].filter((s) => s.active).length;
+
+  if (
+    afterActiveWeight > beforeActiveWeight + 0.01 ||
+    afterActiveCount > beforeActiveCount
+  ) {
+    profile.dateLastImproved = profile.lastUpdated;
+    saveAdaptiveProfile(profile);
+  }
 
   return { added: newSamples.length, profile };
 }

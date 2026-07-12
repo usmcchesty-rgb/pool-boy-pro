@@ -78,16 +78,16 @@ const SALT_PAD_ROIS: PadRoi[] = [
 
 export const CLOROX_SIX_WAY_SCAN_TARGET: ScanTargetConfig = {
   stripType: 'six_way',
-  aspectRatio: 0.22,
+  aspectRatio: 0.32,
   padRois: SIX_WAY_PAD_ROIS,
-  neutralRoi: { x: 0.05, y: 0.02, w: 0.12, h: 0.08 },
+  neutralRoi: { x: 0.05, y: 0.02, w: 0.12, h: 0.06 },
 };
 
 export const CLOROX_SALT_SCAN_TARGET: ScanTargetConfig = {
   stripType: 'salt',
-  aspectRatio: 0.45,
+  aspectRatio: 0.55,
   padRois: SALT_PAD_ROIS,
-  neutralRoi: { x: 0.05, y: 0.05, w: 0.12, h: 0.1 },
+  neutralRoi: { x: 0.05, y: 0.05, w: 0.12, h: 0.08 },
 };
 
 export function getCloroxScanTarget(stripType: 'six_way' | 'salt'): ScanTargetConfig {

@@ -6,4 +6,7 @@ export * from './sessionCalibration';
 export * from './qualityAnalyzer';
 export * from './scanProcessor';
 export * from './cameraSession';
+export * from './stripGeometry';
+export * from './temporaryPreview';
+export * from './stripDetector';
 export * from './types';

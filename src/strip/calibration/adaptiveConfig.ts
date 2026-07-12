@@ -1,10 +1,11 @@
 /**
  * Adaptive learning thresholds — conservative by design.
  *
- * Activation:
- * - 0–2 reliable samples: baseline anchor only (no learned blend)
- * - 3–4 reliable samples: light blend (15% learned weight)
- * - 5+ reliable samples: up to 60% learned weight (baseline never below 40%)
+ * Progressive phases (see learningPhases.ts) adjust blend weights by verified scan count:
+ * - Phase 1 (0–10 scans): aggressive — 28% at 1 sample, up to 75% learned
+ * - Phase 2 (11–30 scans): moderate — 15% at 3 samples, up to 60% learned
+ * - Phase 3 (31–100 scans): refinement — up to 45% learned
+ * - Phase 4 (100+ scans): maintenance — up to 25% learned
  *
  * Drift: learned RGB clamped to ±40 per channel from baseline.
  * Outliers: samples with LAB distance > 12 from weighted median are rejected.
