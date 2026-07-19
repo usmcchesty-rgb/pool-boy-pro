@@ -3,7 +3,16 @@ import type { TaylorTestInputs, TaylorTestStep } from '../../models/taylorKit';
 import { isSaltSanitizer } from '../../models/taylorKit';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
+import { Button } from '../ui/Button';
 import { CalculatedResult } from './TaylorGuide';
+import {
+  getAcidBaseDemandExplanation,
+  getAcidBaseDemandOffer,
+  getCombinedChlorineClearMessage,
+  getFcNoPinkHelpItems,
+  shouldShowAcidDemand,
+  shouldShowBaseDemand,
+} from '../../utilities/taylorGuidance';
 import {
   calculateCombinedChlorine,
   calculateFreeChlorine,
@@ -22,6 +31,7 @@ export interface TaylorStepFieldsProps {
   onUpdateInputs: (patch: Partial<TaylorTestInputs>) => void;
   onUpdatePool: (patch: Partial<PoolInfo>) => void;
   compact?: boolean;
+  onRequestHelp?: () => void;
 }
 
 function poolVolumeValue(volume: number): number | undefined {
@@ -37,6 +47,7 @@ export function TaylorStepFields({
   onUpdateInputs,
   onUpdatePool,
   compact,
+  onRequestHelp,
 }: TaylorStepFieldsProps) {
   const fcPpm =
     inputs.fcDropCount !== undefined
@@ -156,8 +167,41 @@ export function TaylorStepFields({
               onChange={(e) => onUpdateInputs({ fcDropCount: parseNumericInput(e.target.value) })}
               unit="drops"
               error={errors.fcDropCount}
+              hint="Keep adding one drop at a time while gently swirling the tube after each drop."
             />
           </div>
+          {!compact && (
+            <div className="taylor-interactive">
+              <p className="taylor-interactive__prompt">
+                Sample never turned pink after adding R-0870 powder?
+              </p>
+              <ul className="taylor-interactive__help-list">
+                {getFcNoPinkHelpItems().map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <div className="taylor-interactive__actions">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  type="button"
+                  onClick={() => onUpdateInputs({ fcDropCount: undefined })}
+                >
+                  Retry
+                </Button>
+                <Button
+                  size="sm"
+                  type="button"
+                  onClick={() => onUpdateInputs({ fcDropCount: 0 })}
+                >
+                  Continue with 0 ppm
+                </Button>
+                <Button size="sm" variant="ghost" type="button" onClick={onRequestHelp}>
+                  Help
+                </Button>
+              </div>
+            </div>
+          )}
           {!compact && fcPpm !== null && (
             <CalculatedResult
               label="Calculated Free Chlorine"
@@ -176,19 +220,61 @@ export function TaylorStepFields({
               Using the same {inputs.sampleSizeMl} mL sample ({formatFasDpdFormula(inputs.sampleSizeMl)}).
             </p>
           )}
-          <div className="form-grid">
-            <Input
-              label="Additional R-0871 Drops (after R-0003)"
-              type="number"
-              min={0}
-              step={1}
-              value={formatNumericInputValue(inputs.ccDropCount)}
-              onChange={(e) => onUpdateInputs({ ccDropCount: parseNumericInput(e.target.value) })}
-              unit="drops"
-              error={errors.ccDropCount}
-            />
-          </div>
-          {!compact && ccPpm !== null && (
+          {!compact && (
+            <div className="taylor-interactive">
+              <p className="taylor-interactive__prompt">
+                After adding 5 drops R-0003 and mixing for 10 seconds, did the sample turn pink?
+              </p>
+              <div className="taylor-interactive__actions">
+                <Button
+                  size="sm"
+                  variant={!inputs.ccSampleStayedClear ? 'primary' : 'secondary'}
+                  type="button"
+                  onClick={() =>
+                    onUpdateInputs({ ccSampleStayedClear: false, ccDropCount: inputs.ccDropCount ?? undefined })
+                  }
+                >
+                  Yes — continue titrating
+                </Button>
+                <Button
+                  size="sm"
+                  variant={inputs.ccSampleStayedClear ? 'primary' : 'secondary'}
+                  type="button"
+                  onClick={() => onUpdateInputs({ ccSampleStayedClear: true, ccDropCount: 0 })}
+                >
+                  No — stayed clear
+                </Button>
+              </div>
+            </div>
+          )}
+          {inputs.ccSampleStayedClear && !compact && (
+            <div className="taylor-success taylor-success--inline" role="status">
+              {getCombinedChlorineClearMessage().split('\n\n').map((p) => (
+                <p key={p}>{p}</p>
+              ))}
+            </div>
+          )}
+          {!inputs.ccSampleStayedClear && (
+            <div className="form-grid">
+              <Input
+                label="Additional R-0871 Drops (after R-0003)"
+                type="number"
+                min={0}
+                step={1}
+                value={formatNumericInputValue(inputs.ccDropCount)}
+                onChange={(e) =>
+                  onUpdateInputs({
+                    ccSampleStayedClear: false,
+                    ccDropCount: parseNumericInput(e.target.value),
+                  })
+                }
+                unit="drops"
+                error={errors.ccDropCount}
+                hint="Count only drops added after R-0003, swirling after each drop."
+              />
+            </div>
+          )}
+          {!compact && !inputs.ccSampleStayedClear && ccPpm !== null && (
             <CalculatedResult
               label="Calculated Combined Chlorine"
               value={`${ccPpm.toFixed(ccPpm % 1 === 0 ? 0 : 1)} ppm`}
@@ -198,43 +284,87 @@ export function TaylorStepFields({
         </>
       );
 
-    case 'ph':
+    case 'ph': {
+      const demandOffer = getAcidBaseDemandOffer(inputs.ph, pool);
       return (
-        <div className="form-grid">
-          <Input
-            label="Measured pH"
-            type="number"
-            step={0.1}
-            min={6.8}
-            max={8.4}
-            value={formatNumericInputValue(inputs.ph)}
-            onChange={(e) => onUpdateInputs({ ph: parseNumericInput(e.target.value) })}
-            error={errors.ph}
-          />
-          <Input
-            label="Acid Demand (optional)"
-            type="number"
-            min={0}
-            max={50}
-            step={1}
-            value={formatNumericInputValue(inputs.acidDemand)}
-            onChange={(e) => onUpdateInputs({ acidDemand: parseNumericInput(e.target.value) })}
-            unit="drops"
-            error={errors.acidDemand}
-          />
-          <Input
-            label="Base Demand (optional)"
-            type="number"
-            min={0}
-            max={50}
-            step={1}
-            value={formatNumericInputValue(inputs.baseDemand)}
-            onChange={(e) => onUpdateInputs({ baseDemand: parseNumericInput(e.target.value) })}
-            unit="drops"
-            error={errors.baseDemand}
-          />
-        </div>
+        <>
+          <div className="form-grid">
+            <Input
+              label="Measured pH"
+              type="number"
+              step={0.1}
+              min={6.8}
+              max={8.4}
+              value={formatNumericInputValue(inputs.ph)}
+              onChange={(e) => {
+                const ph = parseNumericInput(e.target.value);
+                const offer = getAcidBaseDemandOffer(ph, pool);
+                const patch: Partial<TaylorTestInputs> = { ph };
+                if (offer === 'in_range') {
+                  patch.acidDemand = undefined;
+                  patch.baseDemand = undefined;
+                } else if (offer === 'acid') {
+                  patch.baseDemand = undefined;
+                } else if (offer === 'base') {
+                  patch.acidDemand = undefined;
+                }
+                onUpdateInputs(patch);
+              }}
+              error={errors.ph}
+            />
+          </div>
+          {demandOffer === 'in_range' && !compact && (
+            <div className="taylor-info-banner" role="status">
+              {getAcidBaseDemandExplanation('in_range').split('\n\n').map((p) => (
+                <p key={p}>{p}</p>
+              ))}
+            </div>
+          )}
+          {shouldShowBaseDemand(demandOffer) && (
+            <>
+              {!compact && (
+                <p className="taylor-note">{getAcidBaseDemandExplanation('base')}</p>
+              )}
+              <div className="form-grid">
+                <Input
+                  label="Base Demand (optional)"
+                  type="number"
+                  min={0}
+                  max={50}
+                  step={1}
+                  value={formatNumericInputValue(inputs.baseDemand)}
+                  onChange={(e) => onUpdateInputs({ baseDemand: parseNumericInput(e.target.value) })}
+                  unit="drops R-0016"
+                  error={errors.baseDemand}
+                  hint="Optional — estimates soda ash needed to raise pH."
+                />
+              </div>
+            </>
+          )}
+          {shouldShowAcidDemand(demandOffer) && (
+            <>
+              {!compact && (
+                <p className="taylor-note">{getAcidBaseDemandExplanation('acid')}</p>
+              )}
+              <div className="form-grid">
+                <Input
+                  label="Acid Demand (optional)"
+                  type="number"
+                  min={0}
+                  max={50}
+                  step={1}
+                  value={formatNumericInputValue(inputs.acidDemand)}
+                  onChange={(e) => onUpdateInputs({ acidDemand: parseNumericInput(e.target.value) })}
+                  unit="drops R-0015"
+                  error={errors.acidDemand}
+                  hint="Optional — estimates muriatic acid needed to lower pH."
+                />
+              </div>
+            </>
+          )}
+        </>
       );
+    }
 
     case 'totalAlkalinity':
       return (

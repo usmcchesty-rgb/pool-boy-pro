@@ -38,6 +38,9 @@ export function validateTaylorStep(
       break;
 
     case 'combinedChlorine':
+      if (inputs.ccSampleStayedClear) {
+        break;
+      }
       if (inputs.ccDropCount === undefined) {
         errors.ccDropCount = 'Enter additional drop count.';
       } else if (inputs.ccDropCount < 0) {

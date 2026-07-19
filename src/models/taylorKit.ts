@@ -22,6 +22,8 @@ export interface TaylorTestInputs {
   cyanuricAcid?: number;
   salt?: number;
   saltSkipped: boolean;
+  /** Combined chlorine sample stayed clear after R-0003 — CC is 0 ppm */
+  ccSampleStayedClear: boolean;
   temperature?: number;
   temperatureUnit: TemperatureUnit;
 }
@@ -45,6 +47,7 @@ export function defaultTaylorInputs(settings: AppSettings): TaylorTestInputs {
     cyanuricAcid: 40,
     salt: 3200,
     saltSkipped: false,
+    ccSampleStayedClear: false,
     temperature: 82,
     temperatureUnit: settings.preferredTemperatureUnit,
   };

@@ -6,6 +6,15 @@ import { Input } from '../ui/Input';
 import { ParameterRow } from './ParameterRow';
 import { RecommendationList } from './RecommendationList';
 import { TaylorGuide } from './TaylorGuide';
+import {
+  TaylorAdaptiveInsightsPanel,
+  TaylorCompletionEncouragement,
+  TaylorConfidenceNote,
+  TaylorLearnMore,
+  TaylorNextStepPreview,
+  TaylorResultInterpretationPanel,
+  TaylorWhyThisTest,
+} from './TaylorAssistantPanels';
 import { PageHeader } from '../layout/PageHeader';
 import { TaylorStepFields } from './TaylorStepFields';
 import { ReviewEditSections } from './ReviewEditSections';
@@ -30,6 +39,14 @@ import {
   getTaylorStepOrder,
 } from '../../utilities/taylorSteps';
 import { TAYLOR_STEP_GUIDES } from '../../constants/taylorStepGuides';
+import {
+  getCompletionEncouragement,
+  getConfidenceMessage,
+  getNextStepPreview,
+  getStepAdaptiveInsights,
+  getStepInterpretation,
+  getWhyThisTest,
+} from '../../utilities/taylorAssistant';
 
 export interface TaylorTestWorkflowProps {
   title: string;
@@ -60,6 +77,8 @@ export function TaylorTestWorkflow({
   const [notes, setNotes] = useState(initialNotes);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [expandTroubleshooting, setExpandTroubleshooting] = useState(false);
+  const [usedTroubleshooting, setUsedTroubleshooting] = useState(false);
 
   const stepIndex = getTaylorStepIndex(step, pool, inputs.saltSkipped);
   const stepOrder = getTaylorStepOrder(pool, inputs.saltSkipped);
@@ -74,6 +93,27 @@ export function TaylorTestWorkflow({
   );
   const warnings = useMemo(() => getTaylorWarnings(inputs, pool), [inputs, pool]);
   const guide = TAYLOR_STEP_GUIDES[step];
+  const interpretation = useMemo(
+    () =>
+      step !== 'review' && step !== 'pool'
+        ? getStepInterpretation(step, inputs, pool, preview.parameters)
+        : null,
+    [step, inputs, pool, preview.parameters]
+  );
+  const stepInsights = useMemo(
+    () => (step !== 'review' && step !== 'pool' ? getStepAdaptiveInsights(step, inputs, pool) : []),
+    [step, inputs, pool]
+  );
+  const nextPreview = useMemo(
+    () => (step !== 'review' && step !== 'pool' ? getNextStepPreview(step, pool, inputs.saltSkipped) : null),
+    [step, pool, inputs.saltSkipped]
+  );
+  const confidenceMessage = useMemo(
+    () => getConfidenceMessage(interpretation, usedTroubleshooting),
+    [interpretation, usedTroubleshooting]
+  );
+  const whyThisTest = step !== 'review' && step !== 'pool' ? getWhyThisTest(step) : null;
+  const completionMessage = getCompletionEncouragement();
 
   function updatePool(patch: Partial<PoolInfo>) {
     setPool((prev) => ({ ...prev, ...patch }));
@@ -101,6 +141,8 @@ export function TaylorTestWorkflow({
   function goToStep(target: TaylorTestStep) {
     setStep(target);
     setErrors({});
+    setExpandTroubleshooting(false);
+    setUsedTroubleshooting(false);
   }
 
   function goToStepFromNav(target: TaylorTestStep) {
@@ -208,8 +250,22 @@ export function TaylorTestWorkflow({
         <Card title={currentStepMeta.label} className="test-form-card">
           <p className="step-description">{currentStepMeta.description}</p>
 
+          {whyThisTest && <TaylorWhyThisTest explanation={whyThisTest} />}
+
+          {step !== 'review' && step !== 'pool' && <TaylorLearnMore />}
+
           {step !== 'review' && guide && (
-            <TaylorGuide title={guide.title} reagents={guide.reagents} steps={guide.steps} />
+            <TaylorGuide
+              title={guide.title}
+              purpose={guide.purpose}
+              reagents={guide.reagents}
+              steps={guide.steps}
+              expectedColors={guide.expectedColors}
+              endpoint={guide.endpoint}
+              commonMistakes={guide.commonMistakes}
+              troubleshooting={guide.troubleshooting}
+              expandTroubleshooting={expandTroubleshooting}
+            />
           )}
 
           {showSaltOptional && (
@@ -219,16 +275,30 @@ export function TaylorTestWorkflow({
           )}
 
           {step !== 'review' ? (
-            <TaylorStepFields
-              step={step}
-              inputs={inputs}
-              pool={pool}
-              errors={errors}
-              onUpdateInputs={updateInputs}
-              onUpdatePool={updatePool}
-            />
+            <>
+              <TaylorStepFields
+                step={step}
+                inputs={inputs}
+                pool={pool}
+                errors={errors}
+                onUpdateInputs={updateInputs}
+                onUpdatePool={updatePool}
+                onRequestHelp={() => {
+                  setExpandTroubleshooting(true);
+                  setUsedTroubleshooting(true);
+                }}
+              />
+              {interpretation && <TaylorResultInterpretationPanel interpretation={interpretation} />}
+              {stepInsights.length > 0 && <TaylorAdaptiveInsightsPanel insights={stepInsights} />}
+              {confidenceMessage && <TaylorConfidenceNote message={confidenceMessage} />}
+              {interpretation && nextPreview && <TaylorNextStepPreview message={nextPreview} />}
+            </>
           ) : (
             <div className="review-section">
+              <TaylorCompletionEncouragement
+                title={completionMessage.title}
+                paragraphs={completionMessage.paragraphs}
+              />
               <div className="review-score">
                 <span className="review-score__value">{preview.overallScore}</span>
                 <span className="review-score__label">Water Quality Score</span>

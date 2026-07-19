@@ -24,6 +24,7 @@ const baseInputs: TaylorTestInputs = {
   cyanuricAcid: 40,
   salt: 3200,
   saltSkipped: false,
+  ccSampleStayedClear: false,
   temperature: 82,
   temperatureUnit: 'fahrenheit',
 };

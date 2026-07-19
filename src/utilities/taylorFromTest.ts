@@ -23,6 +23,7 @@ export function taylorInputsFromWaterTest(test: WaterTest, settings: AppSettings
     cyanuricAcid: readings.cyanuricAcid,
     salt: saltSkipped ? 0 : readings.salt,
     saltSkipped,
+    ccSampleStayedClear: readings.combinedChlorine === 0,
     temperature: readings.temperature,
     temperatureUnit: readings.temperatureUnit ?? settings.preferredTemperatureUnit,
   };
